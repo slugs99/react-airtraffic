@@ -26,6 +26,7 @@ export default function Header(props) {
     logoutAsync();
     window.location.href = '/';
   };
+
   const makeBrand = () => {
     let name;
     props.routes.map((prop) => {
@@ -36,10 +37,13 @@ export default function Header(props) {
     });
     return name;
   };
+
   const { color } = props;
+
   const appBarClasses = classNames({
     [' ' + classes[color]]: color,
   });
+
   return (
     <AppBar className={classes.appBar + appBarClasses}>
       <Toolbar className={classes.container}>

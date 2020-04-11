@@ -1,6 +1,9 @@
+/* eslint-disable @typescript-eslint/explicit-function-return-type */
 import React, { useEffect, createRef, useState } from 'react';
+import PropTypes from 'prop-types';
 import { Switch, Route, Redirect } from 'react-router-dom';
 import { Grid } from '@material-ui/core';
+import LoadingOverlay from 'react-loading-overlay';
 
 import PerfectScrollbar from 'perfect-scrollbar';
 import 'perfect-scrollbar/css/perfect-scrollbar.css';
@@ -16,7 +19,7 @@ import routes from '../routes';
 import { makeStyles } from '@material-ui/core/styles';
 
 import styles from '../assets/styles/adminStyles';
-import { getFlights } from '../services/backend';
+import { getFlights1hourInterval } from '../services/backend';
 import ICAO_JSON from '../utils/icao.json';
 
 const useStyles = makeStyles(styles);
@@ -82,6 +85,13 @@ const RenderTopTenBusy = ({ topTenBusy }) => {
   );
 };
 
+RenderTopTenBusy.propTypes = {
+  topTenBusy: PropTypes.arrayOf({
+    name: PropTypes.string,
+    count: PropTypes.number,
+    arrivalCount: PropTypes.number,
+  }),
+};
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let ps;
 
@@ -95,61 +105,8 @@ const Dashboard = ({ ...rest }) => {
   const [color, setColor] = useState('blue');
   const [fixedClasses, setFixedClasses] = useState('dropdown show');
   const [mobileOpen, setMobileOpen] = useState(false);
-
-  const record = {};
-  const recordArr = [];
-  const flights = getFlights();
-  let flightInfo;
-  flights.forEach((flight) => {
-    const flightEstDepartureIcao = flight.estDepartureAirport;
-    const flightEstArrivalIcao = flight.estArrivalAirport;
-    let arrivalIncrement = 0;
-
-    if (flightEstArrivalIcao) {
-      flightInfo = ICAO_JSON[flightEstArrivalIcao];
-      arrivalIncrement = 1;
-    } else if (flightEstDepartureIcao) {
-      flightInfo = ICAO_JSON[flightEstDepartureIcao];
-      arrivalIncrement = 0;
-    }
-
-    if (flightInfo?.city) {
-      record[flightInfo.city] = {
-        ...flightInfo,
-        count: (record?.[flightInfo.city]?.count ?? 0) + 1,
-        arrivalCount:
-          (record?.[flightInfo.city]?.arrivalIncrement ?? 0) + arrivalIncrement,
-      };
-      const found = recordArr.find((item) => item.city === flightInfo.city);
-      if (!found) {
-        recordArr.push(record[flightInfo.city]);
-      } else {
-        found.count = record[flightInfo.city].count;
-        found.arrivalCount = record[flightInfo.city].arrivalCount;
-      }
-    }
-  });
-  const [topTenBusy, setTopTenBusy] = useState(
-    recordArr
-      .sort((a, b) => {
-        return a.count > b.count ? -1 : 1;
-      })
-      .slice(0, 10),
-  );
-
-  const handleImageClick = (image) => {
-    setImage(image);
-  };
-  const handleColorClick = (color) => {
-    setColor(color);
-  };
-  const handleFixedClick = () => {
-    if (fixedClasses === 'dropdown') {
-      setFixedClasses('dropdown show');
-    } else {
-      setFixedClasses('dropdown');
-    }
-  };
+  const [loading, setLoading] = useState(false);
+  const [topTenBusy, setTopTenBusy] = useState([]);
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
@@ -161,9 +118,65 @@ const Dashboard = ({ ...rest }) => {
       setMobileOpen(false);
     }
   };
+  
+  const asyncFetchFlights = async () => {
+    try {
+      const record = {};
+      const recordArr = [];
+      setLoading(true);
+      const flights = await getFlights1hourInterval();
+      // console.log('flightsflights', flights);
+      let flightInfo;
+      flights.forEach((flight) => {
+        const flightEstDepartureIcao = flight.estDepartureAirport;
+        const flightEstArrivalIcao = flight.estArrivalAirport;
+        let arrivalIncrement = 0;
+
+        if (flightEstArrivalIcao) {
+          flightInfo = ICAO_JSON[flightEstArrivalIcao];
+          arrivalIncrement = 1;
+        } else if (flightEstDepartureIcao) {
+          flightInfo = ICAO_JSON[flightEstDepartureIcao];
+          arrivalIncrement = 0;
+        }
+
+        if (flightInfo?.city) {
+          record[flightInfo.city] = {
+            ...flightInfo,
+            count: (record?.[flightInfo.city]?.count ?? 0) + 1,
+            arrivalCount:
+              (record?.[flightInfo.city]?.arrivalIncrement ?? 0) + arrivalIncrement,
+          };
+          const found = recordArr.find((item) => item.city === flightInfo.city);
+          if (!found) {
+            recordArr.push(record[flightInfo.city]);
+          } else {
+            found.count = record[flightInfo.city].count;
+            found.arrivalCount = record[flightInfo.city].arrivalCount;
+          }
+        }
+      });
+
+      console.log('recordArr', recordArr)
+
+      setTopTenBusy(
+        recordArr
+          .sort((a, b) => {
+            return a.count > b.count ? -1 : 1;
+          })
+          .slice(0, 10)
+      );
+    } catch (e) {
+      console.log('asyncFetchFlights e', e)
+    }
+
+    setLoading(false);
+  }
+
   // initialize and destroy the PerfectScrollbar plugin
   useEffect(() => {
-    console.log('hey baby');
+    asyncFetchFlights();
+
     if (navigator.platform.indexOf('Win') > -1) {
       ps = new PerfectScrollbar(mainPanel?.current, {
         suppressScrollX: true,
@@ -179,7 +192,8 @@ const Dashboard = ({ ...rest }) => {
       }
       window.removeEventListener('resize', resizeFunction);
     };
-  }, [mainPanel]);
+  }, []);
+
   return (
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     <div className={classes?.wrapper ?? ''}>
@@ -201,22 +215,19 @@ const Dashboard = ({ ...rest }) => {
         />
         {/* On the /maps route we want the map to be on full screen - this is not possible if the content and conatiner classes are present because they have some paddings which would make the map smaller */}
         {getRoute() ? (
-          <div className={classes.content}>
-            <div className={classes.container}>{switchRoutes}</div>
-            <RenderTopTenBusy topTenBusy={topTenBusy} />
-          </div>
+            <LoadingOverlay
+              active={loading}
+              spinner
+              text='Loading...'
+              >
+              <div className={classes.content}>
+                <div className={classes.container}>{switchRoutes}</div>
+                <RenderTopTenBusy topTenBusy={topTenBusy} />
+              </div>
+            </LoadingOverlay>
         ) : (
           <div className={classes.map}>{switchRoutes}</div>
         )}
-        {/* {getRoute() ? <Footer /> : null} */}
-        {/* <FixedPlugin
-          handleImageClick={handleImageClick}
-          handleColorClick={handleColorClick}
-          bgColor={color}
-          bgImage={image}
-          handleFixedClick={handleFixedClick}
-          fixedClasses={fixedClasses}
-        /> */}
       </div>
     </div>
   );

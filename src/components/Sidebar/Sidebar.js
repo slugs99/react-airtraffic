@@ -22,10 +22,12 @@ const useStyles = makeStyles(styles);
 export default function Sidebar(props) {
   const classes = useStyles();
   // verifies if routeName is the one active (in browser input)
-  function activeRoute(routeName) {
+  const activeRoute = (routeName) => {
     return window.location.href.indexOf(routeName) > -1 ? true : false;
   }
+  
   const { color, logo, image, logoText, routes } = props;
+  
   var links = (
     <List className={classes.list}>
       {routes.map((prop, key) => {
@@ -80,7 +82,8 @@ export default function Sidebar(props) {
       })}
     </List>
   );
-  var brand = (
+  
+  const brand = (
     <div className={classes.logo}>
       <a
         href="#"
@@ -96,6 +99,7 @@ export default function Sidebar(props) {
       </a>
     </div>
   );
+  
   return (
     <div>
       <Hidden mdUp implementation="css">
