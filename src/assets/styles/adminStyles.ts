@@ -6,6 +6,7 @@ const appStyle = (theme: any): any => ({
     position: 'relative',
     top: '0',
     height: '100vh',
+    backgroundColor: '#f5f5f5',
   },
   mainPanel: {
     [theme.breakpoints.up('md')]: {
